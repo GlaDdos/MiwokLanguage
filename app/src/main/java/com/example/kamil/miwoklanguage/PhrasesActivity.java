@@ -1,5 +1,7 @@
 package com.example.kamil.miwoklanguage;
 
+import android.content.Context;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -14,6 +16,7 @@ public class PhrasesActivity extends AppCompatActivity {
 
     ArrayList<Word> words;
     MediaPlayer mediaPlayer;
+    AudioManager audioManager;
 
     MediaPlayer.OnCompletionListener onCompletionListener = new MediaPlayer.OnCompletionListener() {
         @Override
@@ -22,10 +25,26 @@ public class PhrasesActivity extends AppCompatActivity {
         }
     };
 
+    AudioManager.OnAudioFocusChangeListener onAudioFocusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+            if(focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+                mediaPlayer.pause();
+                mediaPlayer.seekTo(0);
+            } else if(focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+                mediaPlayer.start();
+            } else if ( focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                releaseMediaPlayer();
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.word_list);
+
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         words = new ArrayList<>();
         words.add(new Word("Where are you going?", "minto wuksus", R.raw.phrase_where_are_you_going));
@@ -51,10 +70,15 @@ public class PhrasesActivity extends AppCompatActivity {
 
                 Word word = words.get(position);
 
-                mediaPlayer = MediaPlayer.create(PhrasesActivity.this, word.getAudioResourceId());
-                mediaPlayer.start();
+                int result = audioManager.requestAudioFocus(onAudioFocusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
 
-                mediaPlayer.setOnCompletionListener(onCompletionListener);
+                if(result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+
+                    mediaPlayer = MediaPlayer.create(PhrasesActivity.this, word.getAudioResourceId());
+                    mediaPlayer.start();
+
+                    mediaPlayer.setOnCompletionListener(onCompletionListener);
+                }
             }
         });
     }
@@ -73,6 +97,8 @@ public class PhrasesActivity extends AppCompatActivity {
 
             mediaPlayer.release();
             mediaPlayer = null;
+
+            audioManager.abandonAudioFocus(onAudioFocusChangeListener);
         }
     }
 }
